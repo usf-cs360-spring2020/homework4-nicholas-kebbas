@@ -1,0 +1,11 @@
+.image-mid {
+  width: 80%;
+}
+
+.center {
+  margin: 0 auto;
+}
+
+.image-mid.center {
+  display:block;
+}
