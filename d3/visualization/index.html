@@ -10,6 +10,8 @@
 <script src="https://d3js.org/d3.v5.min.js"></script>
 <script src="https://d3js.org/d3-zoom.v1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js"></script>
+<script src="https://d3js.org/d3-hierarchy.v1.min.js"></script>
 </head>
 
 <body>
@@ -23,7 +25,7 @@
       <!-- TODO: Change title -->
       <h1 class="title">Nick Kebbas's Website</h1>
       <!-- TODO: Change subtitle -->
-      <h2 class="subtitle">Homework 3 Website</h2>
+      <h2 class="subtitle">Homework 4 Website</h2>
     </div>
   </div>
 </section>
@@ -69,332 +71,176 @@
   <div class="container">
 <div class="content">
   <h2> License and Permissioning</h2>
-  <p>Data is in the public domain, as noted here: https://datasf.org/opendata/terms-of-use/</p>
+  <p>Data is in the public domain, as noted here: https://data.sfgov.org/Public-Safety/Fire-Department-Calls-for-Service/nuek-vuh3/data</p>
   <h2>Data Set Information</h2>
-  <p>The data set is 4,135,282 rows. The data set for the time period we're looking at (February 2020) is about 58,262 rows. We accessed this data on April 6, 2020.<p>
+  <p>The data set is about 40,000 rows. We accessed this data on April 19, 2020.<p>
   <div>
-    <h2>Noise Complaints Across San Francisco</h2>
+    <h2>January 1, 2020 - March, 2020 Potentially Life Threatening Incidents across neighborhoods, furher grouped by type.</h2>
     <h3>Data Summary</h3>
-    <p> Our visualization overlays instances noise complaints across San Francisco to determine whether some areas receive more noise complaints than others. We further seperately encode Fridays and Saturdays, Weekdays, and Sundays to determine whether some days are more prone to complaints than others.
-    <p>The columns we consider are date/time opened and type of incident. We display each incident as a dot, and the color of the dot is determined by the day of the week that incident was reported on.</p>
-    <p>We filtered the original data using the SODA API, so that our data set only included incidents that were reported between February 1, 2020, and February 29, 2020. We further wrangled the data in Javascript to determine the day of the week of each incident.</p>
     <h3>Conclusions</h3>
-    <p>One of the most obvious conclusions to draw from the visualization if that some areas have more incidents than others. These are high traffic, non-residential areas, such as the Missiona and SOMA district. However, this visualization also provides insight into where people typically congregate during the weekends in San Francisco. Areas with more yellow dots are likely more heavily populated during the week (since there's an increase in the number of reported noise incidents),
-      while blue indicate a higher population density during the weekends. For example, the financial district has several reported noise incidents during the week, but none during the weekend, indicating that area is not heavily populated during the weekends. Areas such as Haight and Alamo square report more cases on the weekends, indicating that people congregate in these areas during that time.</p>
     <h3>Interactivity</h3>
-    <p> We added the ability to zoom into the map to more clearly see the dispersion and coloring of the different dots.  We also added toolips on hovers on the dots to provide further information about the incident (including date) to the user.
     <br>
   </div>
 </div>
 </div>
 
 <figure>
-  <svg width="960" height="600" id="vis">
-    <g id="basemap"></g>
-
-    <!-- turn off pointer events for certain groups -->
-    <g id="streets" pointer-events="none"></g>
-    <g id="outline" pointer-events="none"></g>
-
-    <g id="arrests"></g>
-    <g id="tooltip" pointer-events="none"></g>
-    <g id="details" pointer-events="none"></g>
-  </svg>
+<div id="my_dataviz"></div>
 
   <figcaption>
-    Source: <a href="https://data.sfgov.org/Public-Safety/Police-Department-Incident-Reports-2018-to-Present/wg3w-h783">Police Department Incident Reports: 2018 to Present</a> (<a href="https://data.sfgov.org/Geographic-Locations-and-Boundaries/Analysis-Neighborhoods/p5b7-5n3h">Neighborhoods</a>, <a href="https://data.sfgov.org/Geographic-Locations-and-Boundaries/Streets-Active-and-Retired/3psu-pn9h">Streets</a>)
+    Source: <a href="https://data.sfgov.org/Public-Safety/Police-Department-Incident-Reports-2018-to-Present/wg3w-h783">Fire Department</a> (<a href="https://data.sfgov.org/Geographic-Locations-and-Boundaries/Analysis-Neighborhoods/p5b7-5n3h">Neighborhoods</a>, <a href="https://data.sfgov.org/Geographic-Locations-and-Boundaries/Streets-Active-and-Retired/3psu-pn9h">Streets</a>)
   </figcaption>
 </figure>
 
 <script>
-let centered;
-let width = 960;
-let height = 600;
-let zoomed = false;
+let margin = {top: 10, right: 10, bottom: 10, left: 10},
+  width = 960 - margin.left - margin.right,
+  height = 500 - margin.top - margin.bottom;
 
-let legend = document.getElementsByClassName("legend");
+let svg = d3.select("#my_dataviz")
+.append("svg")
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
+.append("g")
+  .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
 
-let path_to_map = "sf_neighborhoods.geojson"
-/* json API info is here
-https://dev.socrata.com/foundry/data.sfgov.org/vw6y-z8j6 */
-const urls = {
-  basemap: path_to_map,
-  streets: "Streets Active and Retired.geojson",
-  arrests: "https://data.sfgov.org/resource/vw6y-z8j6.json"
-};
-
-// calculate date range
-const end = d3.timeDay.floor(new Date(2020, 01, 29));
-const start = d3.timeDay.floor(new Date(2020, 01, 01));
-const format = d3.timeFormat("%Y-%m-%dT%H:%M:%S");
-console.log(format(start), format(end));
-
-// you need your own app token for this to work
-const token = 'nxnYm1q36VZeWqNOBCnMzsKHz';
-
-// add parameters to arrests url
-// urls.arrests += "?$$app_token=" + token;
-// urls.arrests += "&$where=starts_with(resolution, 'Cite or Arrest')";
-// urls.arrests += " AND incident_date between '" + format(start) + "'";
-// urls.arrests += " and '" + format(end) + "'";
-// urls.arrests += " AND point IS NOT NULL";
-
-urls.arrests += "?service_name=Noise Report";
-urls.arrests += "&$where=requested_datetime between '" + format(start) + "'";
-urls.arrests += " and '" + format(end) + "'";
-
-// color scale will map date times to color so we can filter that way
-let colorMap = new Map();
-let dayOfWeekMap = new Map();
-dayOfWeekMap.set("Weekend", 0);
-dayOfWeekMap.set("Weekday", 0);
-dayOfWeekMap.set("Sunday", 0);
-/* set color for every day in feb */
-for (let i = 0; i < 30; i++) {
-  if (i == 1 || i == 7 || i == 8 || i == 14 || i == 15 || i == 21 || i == 22 || i == 28 || i == 29) {
-    colorMap.set(i, "blue")
-    let count = dayOfWeekMap.get("Weekend");
-    count++;
-    dayOfWeekMap.set("Weekend", count);
-  } else if ( i == 2 || i == 9 || i == 16 || i == 23) {
-    colorMap.set(i, "green");
-    let count = dayOfWeekMap.get("Sunday");
-    count++;
-    dayOfWeekMap.set("Sunday", count);
-  } else {
-    colorMap.set(i, "yellow");
-    let count = dayOfWeekMap.get("Weekday");
-    count++;
-    dayOfWeekMap.set("Weekday", count);
-  }
-}
-
-
-// encode special characters
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/encodeURI
-urls.arrests = encodeURI(urls.arrests);
-
-const svg = d3.select("body").select("svg#vis");
-
-const g = {
-  basemap: svg.select("g#basemap"),
-  streets: svg.select("g#streets"),
-  outline: svg.select("g#outline"),
-  arrests: svg.select("g#arrests"),
-  tooltip: svg.select("g#tooltip"),
-  details: svg.select("g#details")
-};
-
-// setup tooltip (shows neighborhood name)
-const tip = g.tooltip.append("text").attr("id", "tooltip");
-tip.attr("text-anchor", "end");
-tip.attr("dx", -5);
-tip.attr("dy", -5);
-tip.style("visibility", "hidden");
-
-// add details widget
-// https://bl.ocks.org/mbostock/1424037
-const details = g.details.append("foreignObject")
-  .attr("id", "details")
-  .attr("width", 960)
-  .attr("height", 500)
-  .attr("x", 0)
-  .attr("y", 0);
-
-const body = details.append("xhtml:body")
-  .style("text-align", "left")
-  .style("background", "none")
-  .html("<p>N/A</p>");
-
-  function clicked(d) {
-
-    var x, y, k;
-
-    if (d && centered !== d) {
-      zoomed = true;
-      var centroid = path.centroid(d);
-      x = centroid[0];
-      y = centroid[1];
-      k = 4;
-      centered = d;
-    } else {
-      zoomed = false;
-      x = width / 2;
-      y = height / 2;
-      k = 1;
-      centered = null;
-    }
-
-    g.basemap.selectAll("path")
-        .classed("active", centered && function(d) { return d === centered; });
-
-    if (zoomed) {
-      g.outline.selectAll("path").style("visibility", "hidden");
-      for (let i = 0; i < legend.length; i++) {
-        legend[i].style.visibility = "hidden";
+// wragle the data
+let objectsArray = []
+let map = new Map();
+let neighborhoods = [];
+d3.csv('calls_for_service_hw4_adjusted.csv')
+  .then(function(data) {
+      // data is now whole data set
+      let previousRow = {}
+      previousRow.parent = "";
+      previousRow.value = "San Francisco"
+      previousRow.id = "1"
+      // add child iteratively
+      previousRow.child = "1";
+      objectsArray.push(previousRow)
+      for (let i = 0; i < 20; i++) {
+        row = {}
+        let neighboorhood = "Neighborhooods - Analysis Boundaries"
+        row.id=data[i]["Call Number"]
+        row.value=data[i]["Neighborhooods - Analysis Boundaries"]
+        if (map.has(row.value)) {
+          map.set(row.value, map.get(row.value)+1);
+        } else {
+          map.set(row.value, 1);
+        }
+        row.child=data[i]["Call Number"]
+        row.parent = previousRow.id
+        objectsArray.push(row)
       }
-    } else {
-      g.outline.selectAll("path").style("visibility", "visible");
-      for (let i = 0; i < legend.length; i++) {
-        legend[i].style.visibility = "visible";
-      }
-    }
+      // for each neighboorhood in the map, make a new node,
+      // make parent san francisco
+      map.forEach(function(value, key) {
+        console.log(value)
+        row = {}
+        row.value=data[i]["Neighborhooods - Analysis Boundaries"]
+        row.parent=previousRow.id
+        objectsArray.push(row)
+        
+      })
+      console.log(map)
+      let childColumn = "child"
+      let parentColumn = "parent"
 
-    g.basemap.transition()
-        .duration(750)
-        .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
-        .style("stroke-width", 1.5 / k + "px");
-        d3.selectAll("circle")
-          .transition()
-          .duration(750)
-          .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
-  }
+      console.log(objectsArray);
+      console.log(childColumn);
+      console.log(parentColumn);
 
-details.style("visibility", "hidden");
+      let stratify = d3.stratify().id(d => d[childColumn]).parentId(d => d[parentColumn])
+      console.log(stratify)
+      let root = stratify(objectsArray)
+      console.log(root.data)
+      console.log(root.children)
+      root.sum(function(d) { return +d.id })   // Compute the numeric value for each entity
+      d3.treemap()
+        .size([width, height])
+        .paddingTop(28)
+        .paddingRight(7)
+        .paddingInner(3)      // Padding between each rectangle
+        //.paddingOuter(6)
+        //.padding(20)
+        (root)
 
-// setup projection
-// https://github.com/d3/d3-geo#geoConicEqualArea
-const projection = d3.geoConicEqualArea();
-projection.parallels([37.692514, 37.840699]);
-projection.rotate([122, 0]);
+        // prepare a color scale
+        var color = d3.scaleOrdinal()
+          .domain(neighborhoods)
+          .range(["red", "orange", "green", "blue", "purple"])
 
-// setup path generator (note it is a GEO path, not a normal path)
-const path = d3.geoPath().projection(projection);
+        // And a opacity scale
+        var opacity = d3.scaleLinear()
+          .domain([10, 30])
+          .range([.5,1])
 
-d3.json(urls.basemap).then(function(json) {
-  // makes sure to adjust projection to fit all of our regions
-  projection.fitSize([960, 600], json);
+console.log(root.leaves())
+ // use this information to add rectangles:
+   svg
+     .selectAll("rect")
+     .data(root.leaves())
+     .enter()
+     .append("rect")
+       .attr('x', function (d) { return d.x0; })
+       .attr('y', function (d) { return d.y0; })
+       .attr('width', function (d) { return d.x1 - d.x0; })
+       .attr('height', function (d) { return d.y1 - d.y0; })
+       .style("stroke", "black")
+       .style("fill", function(d){ return color(map.get(d.data.value))} )
+       .style("opacity", function(d){ return opacity(d.data.id)})
 
-  // draw the land and neighborhood outlines
-  drawBasemap(json);
+   // and to add the text labels
+   svg
+       .selectAll("text")
+       .data(root.leaves())
+       .enter()
+       .append("text")
+         .attr("x", function(d){ return d.x0+5})    // +10 to adjust position (more right)
+         .attr("y", function(d){ return d.y0+20})    // +20 to adjust position (lower)
+         .text(function(d){ return d.data.value})
+         .attr("font-size", "19px")
+         .attr("fill", "white")
 
-  // now that projection has been set trigger loading the other files
-  // note that the actual order these files are loaded may differ
-  d3.json(urls.arrests).then(drawArrests);
-});
+         svg
+          .selectAll("vals")
+          .data(root.leaves())
+          .enter()
+          .append("text")
+            .attr("x", function(d){ return d.x0+5})    // +10 to adjust position (more right)
+            .attr("y", function(d){ return d.y0+35})    // +20 to adjust position (lower)
+            .text(function(d){ return d.data.value })
+            .attr("font-size", "11px")
+            .attr("fill", "white")
 
-function drawBasemap(json) {
-  console.log("basemap", json);
+        // Add title for the 3 groups
+        svg
+          .selectAll("titles")
+          .data(root.descendants().filter(function(d){return d.depth==1}))
+          .enter()
+          .append("text")
+            .attr("x", function(d){ return d.x0})
+            .attr("y", function(d){ return d.y0+21})
+            .text(function(d){ return d.data.name })
+            .attr("font-size", "19px")
+            .attr("fill",  function(d){ return color(d.data.value)} )
 
-  const basemap = g.basemap.selectAll("path.land")
-    .data(json.features)
-    .enter()
-    .append("path")
-    .attr("d", path)
-    .attr("class", "land")
-    .on("click", clicked);
+        // Add title for the 3 groups
+        svg
+          .append("text")
+            .attr("x", 0)
+            .attr("y", 14)    // +20 to adjust position (lower)
+            .text("Three group leaders and 14 employees")
+            .attr("font-size", "19px")
+            .attr("fill",  "grey" )
+    })
 
-  const outline = g.outline.selectAll("path.neighborhood")
-      .data(json.features)
-      .enter()
-      .append("path")
-      .attr("d", path)
-      .attr("class", "neighborhood")
-      .each(function(d) {
-        // save selection in data for interactivity
-        // saves search time finding the right outline later
-        d.properties.outline = this;
-      });
-
-  // add highlight
-  basemap.on("mouseover.highlight", function(d) {
-    d3.select(d.properties.outline).raise();
-    d3.select(d.properties.outline).classed("active", true);
+  .catch(function(error){
+     // handle error
   })
-  .on("mouseout.highlight", function(d) {
-    d3.select(d.properties.outline).classed("active", false);
-  });
-
-  // add tooltip
-  basemap.on("mouseover.tooltip", function(d) {
-    tip.text(d.properties.nhood);
-    tip.style("visibility", "visible");
-  })
-  .on("mousemove.tooltip", function(d) {
-    const coords = d3.mouse(g.basemap.node());
-    tip.attr("x", coords[0]);
-    tip.attr("y", coords[1]);
-  })
-  .on("mouseout.tooltip", function(d) {
-    tip.style("visibility", "hidden");
-  });
-}
-
-function drawArrests(json) {
-  console.log("arrests", json);
-  console.log(new Date(json[0].requested_datetime).getDate())
-
-  // loop through and add projected (x, y) coordinates
-  // (just makes our d3 code a bit more simple later)
-  json.forEach(function(d) {
-    const latitude = parseFloat(d.lat);
-    const longitude = parseFloat(d.long);
-    const pixels = projection([longitude, latitude]);
-
-    d.x = pixels[0];
-    d.y = pixels[1];
-  });
-
-  const symbols = g.arrests.selectAll("circle")
-    .data(json)
-    .enter()
-    .append("circle")
-    .attr("cx", d => d.x)
-    .attr("cy", d => d.y)
-    .attr("r", 5)
-    .attr("class", "symbol")
-    .attr("fill", function(d) {
-      return colorMap.get(new Date(d.requested_datetime).getDate())
-    });
 
 
-  symbols.on("mouseover", function(d) {
-    d3.select(this).raise();
-    d3.select(this).classed("active", true);
-
-    // use template literal for the detail table
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals
-    const html = `
-      <table border="0" cellspacing="0" cellpadding="2">
-      <tbody>
-        <tr>
-          <th>Incident:</th>
-          <td>${d.service_name}</td>
-        </tr>
-        <tr>
-          <th>Date:</th>
-          <td>${new Date(d.requested_datetime).toDateString()}</td>
-        </tr>
-        <tr>
-          <th>Neighborhood:</th>
-          <td>${d.neighborhoods_sffind_boundaries}</td>
-        </tr>
-      </tbody>
-      </table>
-    `;
-
-    body.html(html);
-    details.style("visibility", "visible");
-  });
-
-  symbols.on("mouseout", function(d) {
-    d3.select(this).classed("active", false);
-    details.style("visibility", "hidden");
-  });
-}
-
-function translate(x, y) {
-  return "translate(" + String(x) + "," + String(y) + ")";
-}
-
-/* Legend */
-svg.append("text").attr("x", 55).attr("y", 180).text("Legend").style("font-size", "22px").attr("alignment-baseline","middle").attr("class", "legend")
-svg.append("circle").attr("cx",30).attr("cy",210).attr("r", 6).style("fill", "yellow").attr("class", "legend")
-svg.append("circle").attr("cx",30).attr("cy",230).attr("r", 6).style("fill", "blue").attr("class", "legend")
-svg.append("circle").attr("cx",30).attr("cy",250).attr("r", 6).style("fill", "green").attr("class", "legend")
-svg.append("text").attr("x", 50).attr("y", 210).text("Monday-Thursday").style("font-size", "15px").attr("alignment-baseline","middle").attr("class", "legend")
-svg.append("text").attr("x", 50).attr("y", 230).text("Friday & Saturday").style("font-size", "15px").attr("alignment-baseline","middle").attr("class", "legend")
-svg.append("text").attr("x", 50).attr("y", 250).text("Sunday").style("font-size", "15px").attr("alignment-baseline","middle").attr("class", "legend")
 </script>
 
 <style>
@@ -402,7 +248,8 @@ svg.append("text").attr("x", 50).attr("y", 250).text("Sunday").style("font-size"
   background-color: white;
   fill:white;
   stroke:black;
-  opacity:0.8;}
+  opacity:0.8;
+}
 
   #tooltip {
     stroke: none;
