@@ -61,13 +61,18 @@
             </a>
 
             <div class="navbar-dropdown">
-              <a class="navbar-item" href="d3/visualization/index.html">
+              <a class="navbar-item" href="d3/visualization/visualization-1.html">
                 <span class="icon"><i class="fas fa-map"></i></span>
-                <span> SF February Noise Reports</span>
+                <span> Node Link Visualization</span>
+              </a>
+              <a class="navbar-item" href="d3/visualization/visualization-2.html">
+                <span class="icon"><i class="fas fa-map"></i></span>
+                <span> Treemap Visualization</span>
               </a>
             </div>
           </div>
         </div>
+
 
         <!-- Right navbar items -->
         <div class="navbar-end">
@@ -91,7 +96,21 @@
     <div class="container">
       <!-- Begin page content -->
       <div class="content">
-          <p> <a href="d3/visualization/index.html"> View Visualization &raquo; </a></p>
+        <h2> License and Permissioning</h2>
+        <p>Data is in the public domain, as noted here: https://data.sfgov.org/Public-Safety/Fire-Department-Calls-for-Service/nuek-vuh3/data</p>
+        <h2>Data Set Information</h2>
+        <p>The data set is about 11,000 rows. We accessed this data on April 19, 2020.<p>
+        <div>
+          <h2>March 2020 Potentially Life Threatening Incidents across neighborhoods, grouped by response type</h2>
+          <h3>Data Summary</h3>
+          We analysed incidents reported as "Potentially Life Threatening" over March 2020, across the top 20 neighborhoods of San Francisco in terms of incidents reported.
+          We compared Code 2 responses in the "Potentially Life Threatening" category to all other response types, because Code 2 was by far the most common. Code 2 is classified as a routine call, and not an emergency response that necessarily requires urgent attention. Interestingly, most of the calls in the "Potentially Life Threatening" categorization for this dataset also doesn't require emergency response, which sounds counterintuitive at first.
+          <h3>Data Wrangling</h3>
+          We removed neighborhoods that had number of incidents outside the top 20 to make the visualizations easier to understand. We perform additional data wrangling in Javascript at runtime to manipulate the data into a hierarchical format acceptable by D3's stratify function.
+          <h3>Conclusions</h3>
+          About half of all "Potentially Life Threatening" calls in March were of the Code 2 response type, regardless of neighborhood. Certain areas, such as the Tenderloin, are more prone to incidents deemed "Potentially Life Threatening".
+          <h3>Interactivity</h3>
+          We added tooltips on mouseover to each visualization. The tooltips displays the count of each incident in March.
           <br>
         </div>
         <h2 id="grade"> Grade </h2>
@@ -107,9 +126,9 @@
           <tbody>
 
             <tr>
-              <td>A</td>
+              <td>B</td>
               <td><i class="has-text-success fas fa-check-circle"></i></td>
-              <td>This grade was achieved because I implemented a Non-Proportional Symbol Map in D3 version 5 with details-on-demand interactivity and zooming .</td>
+              <td>I achieved this grade because I implemented one node/link diagram with details-on-demand interactivity in D3v5 and one space filling diagram with details-on-demand interactivity in D3v5.</td>
             </tr>
           </tbody>
 

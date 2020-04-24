@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<link href="style.css" rel="stylesheet" type="text/css">
+<title>SF March Life Threatening Emergencies</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+
+<!-- Load Font Awesome 5 (free) icons -->
+<script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3-zoom.v1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js"></script>
+<script src="https://d3js.org/d3-hierarchy.v1.min.js"></script>
+</head>
+
+<body>
+<!--
+  hard-code the svg and various g layers so that even if the streets are loaded
+  and drawn last, they will still show up behind the symbols
+-->
+<section class="hero is-primary is-bold">
+  <div class="hero-body">
+    <div class="container">
+      <!-- TODO: Change title -->
+      <h1 class="title">Nick Kebbas's Website</h1>
+      <!-- TODO: Change subtitle -->
+      <h2 class="subtitle">Homework 4 Website</h2>
+    </div>
+  </div>
+</section>
+
+<!-- Page navigation -->
+<!-- https://bulma.io/documentation/components/navbar/ -->
+<nav class="navbar is-light" role="navigation" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand">
+      <a class="navbar-item is-active" href="../../index.html">
+        <span class="icon"><i class="fas fa-home"></i></span>
+        <span>Home</span>
+      </a>
+
+      <a role="button" class="navbar-burger burger" aria-label="menu" aria-expanded="false" data-target="main-menu">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </a>
+    </div>
+
+    <div id="main-menu" class="navbar-menu has-text-weight-medium">
+      <!-- Left navbar items -->
+      <div class="navbar-start">
+
+        <!-- TODO: Modify or remove dropdown -->
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">
+            Visualizations
+          </a>
+
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="./visualization-1.html">
+              <span class="icon"><i class="fas fa-map"></i></span>
+              <span> Node Link Visualization</span>
+            </a>
+            <a class="navbar-item" href="#">
+              <span class="icon"><i class="fas fa-map"></i></span>
+              <span> Treemap Visualization</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Right navbar items -->
+      <div class="navbar-end">
+        <!-- TODO: Update as needed -->
+        <a class="navbar-item" href="#about" title="About">
+          <span class="icon"><i class="fas fa-tasks"></i></span>
+          <span>Grade</span>
+        </a>
+
+        <a class="navbar-item" href="#about" title="About">
+          <span class="icon"><i class="fas fa-info-circle"></i></span>
+          <span>About</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+<!-- End page navigation -->
+<section class="section">
+  <div class="container">
+
+<figure>
+<div id="my_dataviz"></div>
+</figure>
+
+<script>
+let margin = {top: 10, right: 10, bottom: 10, left: 10},
+  width = 1000 - margin.left - margin.right,
+  height = 650 - margin.top - margin.bottom;
+
+let svg = d3.select("#my_dataviz")
+.append("svg")
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
+.append("g")
+  .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+// wragle the data
+let objectsArray = []
+let map = new Map();
+let neighborhoods = [];
+d3.csv('calls_for_service_hw4_adjusted.csv')
+  .then(function(data) {
+      // data is now whole data set
+      let previousRow = {}
+      previousRow.child= "0"
+      previousRow.parent = "";
+      previousRow.value = "San Francisco"
+
+      previousRow.count = 35
+      // add child iteratively
+      objectsArray.push(previousRow)
+      // go through and count instances of each neighborhood
+      for (let i = 0; i < data.length; i++) {
+        console.log(data[i])
+        let newRow = {}
+        let neighboorhood = "Neighborhooods - Analysis Boundaries"
+        newRow.child=data[i]["Call Number"].toString()
+        newRow.value=data[i]["Neighborhooods - Analysis Boundaries"]
+        if (map.has(newRow.value)) {
+          map.set(newRow.value, map.get(newRow.value)+1);
+        } else {
+          map.set(newRow.value, 1);
+        }
+        newRow.child=data[i]["Call Number"];
+        newRow.parent=previousRow.child;
+      }
+      console.log("here")
+      // for each neighboorhood in the map, make a new node,
+      // make parent san francisco
+      let mapNameToId = new Map();
+      let count = 1;
+      let mapEventTypeToPlace = new Map();
+      map.forEach(function(value, key) {
+        let array = [];
+        let mapMedicalIncidentToCount = new Map();
+        mapMedicalIncidentToCount.set("Code 2 Transport", 0);
+        let mapCollisionToCount = new Map();
+        mapCollisionToCount.set("Other", 0);
+        array.push(mapMedicalIncidentToCount)
+        array.push(mapCollisionToCount)
+        mapEventTypeToPlace.set(key, array)
+        console.log(key)
+        console.log(value);
+        let row = {};
+        // name of nhood
+        row.child= count.toString();
+        row.parent=previousRow.child;
+        row.value=key;
+        row.count = value;
+        objectsArray.push(row);
+        mapNameToId.set(key, count)
+        count++;
+        console.log(value);
+      })
+
+      // loop through data again and get instances of each
+      // life threatening call, type, and where it was
+
+      // push objects to mapEventTypeToPlace
+      for (let j = 0; j < data.length; j++) {
+        let type = "Call Final Disposition";
+        let number = "Call Number"
+        let neighborhood = "Neighborhooods - Analysis Boundaries";
+        let neighborhoodOfEntry = data[j][neighborhood];
+        // now find parent by neighboorhood thing
+        let thirdRow = {}
+        thirdRow.child = data[j][number]
+        thirdRow.parent = mapNameToId.get(neighborhoodOfEntry).toString()
+        thirdRow.value = data[j][type];
+        let arrayToChange = mapEventTypeToPlace.get(neighborhoodOfEntry)
+        // update the count in our map
+        // if type is medical incident, update index 0 in mapNameToId
+        if (thirdRow.value == "Code 2 Transport"){
+          console.log("its a Code 2 Transport")
+          let mapToChange = arrayToChange[0]
+          mapToChange.set("Code 2 Transport", mapToChange.get("Code 2 Transport")+1)
+          arrayToChange[0] = mapToChange;
+        } else {
+          console.log("its not a medical incident")
+          let mapToChange = arrayToChange[1]
+          mapToChange.set("Other", mapToChange.get("Other")+1)
+          arrayToChange[1] = mapToChange;
+        }
+        mapEventTypeToPlace.set(neighborhoodOfEntry, arrayToChange)
+        // if type is collsion, update index 1
+      }
+      console.log(mapEventTypeToPlace)
+
+      // need to loop again through the new mapNameToId
+      mapEventTypeToPlace.forEach(function(value, key) {
+        let rowOne = {}
+        let rowTwo = {}
+        rowOne.parent = mapNameToId.get(key);
+        rowTwo.parent = mapNameToId.get(key);
+        rowOne.child = count.toString();
+        count++;
+        rowOne.value = "Code 2 Transport"
+        rowTwo.child = count.toString();
+        count++;
+        rowTwo.value = "Other"
+        rowOne.count = value[0].get("Code 2 Transport");
+        rowTwo.count = value[1].get("Other");
+        objectsArray.push(rowOne);
+        if (rowTwo.count > 0) {
+                  objectsArray.push(rowTwo);
+        }
+      });
+      console.log(objectsArray)
+
+      let childColumn = "child"
+      let parentColumn = "parent"
+
+      let stratify = d3.stratify()
+      .id(d => d[childColumn]).
+      parentId(d => d[parentColumn])
+      // console.log(stratify)
+      // data_nested = d3.nest()
+      //   .key( d => d.child )
+      //   .key( d => d.parent )
+      //   .entries(objectsArray);
+      // console.log(data_nested)
+      let root = stratify(objectsArray)
+      root.sum(function(d) { return +d.count })   // Compute the numeric value for each entity
+      d3.treemap()
+        .size([width, height])
+        .paddingTop(28)
+        .paddingRight(17)
+        (root)
+
+        // prepare a color scale
+        var color = d3.scaleOrdinal()
+          .domain(0, 1000)
+          .range(["grey"])
+
+        // And a opacity scale
+        var opacity = d3.scaleLinear()
+          .domain([10, 30])
+          .range([.5,1])
+
+console.log(root.leaves())
+// Define the div for the tooltip
+let div = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+ // use this information to add rectangles:
+   svg
+     .selectAll("rect")
+     .data(root.leaves())
+     .enter()
+     .append("rect")
+       .attr('x', function (d) { return d.x0; })
+       .attr('y', function (d) { return d.y0; })
+       .attr('width', function (d) { return d.x1 - d.x0 + 10; })
+       .attr('height', function (d) { return d.y1 - d.y0 + 10; })
+       .style("stroke", "black")
+       .style("fill", function(d){ return color(d.data.count)} )
+       .style("opacity", function(d){ return opacity(d.data.count)})
+       .on("mouseover", function(d) {
+             div.transition()
+                 .duration(200)
+                 .style("opacity", 1);
+             div	.html("Occurence Type: " + d.data.value + "<br>" + "Occurence Count: " + d.data.count)
+             .style("left", (d3.event.pageX) + "px")
+             .style("top", (d3.event.pageY - 28) + "px");
+             })
+         .on("mouseout", function(d) {
+             div.transition()
+                 .duration(500)
+                 .style("opacity", 0);
+         });
+
+   // and to add the text labels
+   svg
+       .selectAll("text")
+       .data(root.leaves())
+       .enter()
+       .append("text")
+         .attr("x", function(d){ return d.x0+5})    // +10 to adjust position (more right)
+         .attr("y", function(d){ return d.y0+20})    // +20 to adjust position (lower)
+        // Add title for the 3 groups
+  svg
+    .selectAll("titles")
+    .data(root.descendants().filter(function(d){return d.depth==1}))
+    .enter()
+    .append("text")
+      .attr("x", function(d){ return d.x0})
+      .attr("y", function(d){ return d.y0+21})
+      .text(function(d){ return d.data.value })
+      .attr("font-size", "12px")
+      .attr("fill",  function(d){ return "black"} )
+
+  // Add title for the 3 groups
+  svg
+    .append("text")
+      .attr("x", 0)
+      .attr("y", 14)    // +20 to adjust position (lower)
+      .text("Life Threatening Emergencies in San Francisco")
+      .attr("font-size", "16px")
+      .attr("fill",  "grey" )
+    })
+
+  .catch(function(error){
+     console.log("error")
+  })
+
+
+</script>
+
+<style>
+.legend rect{
+  background-color: white;
+  fill:white;
+  stroke:black;
+  opacity:0.8;
+}
+
+div.tooltip {
+    position: absolute;
+    text-align: center;
+    width: 60px;
+    height: 120px;
+    padding: 2px;
+    font: 12px sans-serif;
+    background: lightsteelblue;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+}
+</style>
+</body>
